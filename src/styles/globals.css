@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-canvas: oklch(0.985 0.002 250);
+  --color-surface: oklch(1 0 0);
+  --color-line: oklch(0.922 0.004 250);
+  --color-ink: oklch(0.21 0.02 265);
+  --color-ink-muted: oklch(0.52 0.015 265);
+  --color-brand: oklch(0.55 0.16 264);
+  --color-brand-soft: oklch(0.96 0.02 264);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .dt-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dt-pin-edge::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    width: 14px;
+    transform: translateX(100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+    background: linear-gradient(to right, oklch(0.21 0.02 265 / 0.16), transparent);
+  }
+
+  .dt-scroll[data-scrolled-x='true'] .dt-pin-edge::after {
+    opacity: 1;
+  }
+
+  .dt-collapsible {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dt-collapsible[data-open='true'] {
+    grid-template-rows: 1fr;
+  }
+
+  .dt-collapsible > .dt-collapsible-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* The panel cell is as wide as the whole table, so its content is pinned to
+     the visible area instead of running off past the horizontal scroll. */
+  .dt-panel {
+    position: sticky;
+    left: 0;
+    width: var(--dt-viewport, 100%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dt-collapsible {
+      transition: none;
+    }
+  }
+
+  .dt-numeric {
+    font-variant-numeric: tabular-nums;
+  }
+}
