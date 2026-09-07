@@ -1,76 +1,150 @@
-# Data Table — headless-first, fully typed, built from scratch
+# Data Table
 
-A reusable `DataTable<T>` with no table library behind it, rendering a fitness studio dashboard.
-Sorting, pagination, expansion, pinning, skeletons and error states are all first-class, and the
-same component runs client-side or server-side without knowing which it is in.
+A generic `DataTable<T>` built without a table library, plus two dashboards that use it. Sorting,
+pagination, expandable rows, a pinned column, skeleton loading and error states live in the
+component. The pages supply columns and data.
+
+---
+
+## Setup instructions
 
 ```bash
 npm install
-npm run dev
+npm run dev       
 ```
 
-| Route | What it shows |
-|---|---|
-| `/` | Class timetable: pinned column, expandable attendee rows (inline **and** lazy) |
-| `/members` | A different row shape, no children, defaults to server mode |
+Other scripts:
 
-Every screen has a toolbar to switch data mode, add latency, force a failure, and force the
-loading / empty / error states. `npm run lint` · `npm run typecheck` · `npm run build`.
+```bash
+npm run build
+npm run lint
+npm run typecheck
+```
 
----
+Node 20 or newer. There is no backend to run — three Next.js route handlers serve mock data, with
+query flags for artificial latency and forced failures.
 
-## Architecture
+| Route | Contents |
+| --- | --- |
+| `/` | Class timetable. Pinned column, expandable attendee rows, inline and on-demand |
+| `/members` | A different row shape, no child rows, server mode by default |
 
-Two hook layers, deliberately named so the call site reads correctly.
-
-| Hook | Layer | Called by | Job |
-|---|---|---|---|
-| `useTable<T>` | inside the component | `DataTable` | Composes sorting, pagination and expansion, derives the rows to render. Never fetches. |
-| `useDataTable<T>` | inside the page | dashboards | Feeds the table: fetches in client or server mode, returns spread-ready props. Never renders. |
-
-`useTable` is built from three single-purpose hooks (`useSorting`, `usePagination`,
-`useRowExpansion`), each of which is built on one primitive, `useControllableState`. That is where
-the controlled/uncontrolled contract lives, so it behaves identically everywhere.
+Both screens carry a **Demo controls** toolbar for switching data mode, adding latency, forcing a
+failed request, and forcing the loading, empty and error states.
 
 ```
 src/
+├── app/              routes: layout, 2 pages, 3 API handlers
 ├── components/
-│   ├── data-table/     the reusable component (publishable as-is)
-│   ├── ui/             small primitives: Badge, Button, Skeleton, SegmentedControl
-│   └── demo/           reviewer controls; NOT part of the table API
-├── hooks/              every reusable hook
-├── features/           timetable/ and members/ — columns, panels, dashboards
-├── services/           the only place that knows about URLs
-├── mocks/              deterministic seed data + latency/failure simulation
-├── lib/                cn, comparators, formatters, query helpers
-└── app/                routes and API handlers only
+│   ├── data-table/   the component
+│   ├── demo/         the review toolbar, not part of the table API
+│   ├── members/      members dashboard and columns
+│   ├── timetable/    timetable dashboard, columns, attendee panel
+│   └── ui/           Badge, Button, Skeleton, SegmentedControl
+├── constants/
+├── hooks/
+├── icons/            re-exports lucide-react
+├── layouts/          AppHeader, Logo, NavLink
+├── schemas/          domain types
+├── server/mock/      seed data and latency/failure helpers
+├── services/api/     fetch calls
+├── styles/
+└── utils/            cn, comparators, formatters
 ```
 
 ---
 
-## Component API
+## Component API design and how column definitions work
 
-### Column definitions
+A column definition is data describing  — its name, what it displays, how it behaves:
 
 ```ts
 interface ColumnDef<T> {
-  key: Extract<keyof T, string> | (string & {});  // autocompletes real fields, allows computed ones
+  // Column id, and the field read from each row by default.
+  key: Extract<keyof T, string> | (string & {});
+
+  // What the header cell shows.
   header: ReactNode;
+
+  // Renders one cell from the whole row.
   cell?: (row: T) => ReactNode;
-  sortAccessor?: (row: T) => SortValue;      // for computed columns
-  sortComparator?: (a: T, b: T) => number;   // full escape hatch
+
+  // Sort by this value instead of by what the cell shows.
+  sortAccessor?: (row: T) => SortValue;
+
+  // Turns the header into a sort button. Off by default.
   sortable?: boolean;
+
+  // Fixed width in px. Required on pinned columns.
   width?: number;
+
+  // Minimum width, so long text does not crush the column.
   minWidth?: number;
+
+  // Freezes the column against the left edge during horizontal scroll.
   pinned?: 'left';
+
+  // Text alignment for the header and its cells. Defaults to 'left'.
   align?: 'left' | 'center' | 'right';
+
+  // Screen-reader name for a column with no visible header.
+  srHeader?: string;
 }
 ```
 
-Cells receive the **whole row**, not a pre-extracted value. That is what keeps the surface at a
-single generic: no `DataTable<T, TValue>`, and field access stays fully typed.
+## Example for cloumn definition
 
-### Uncontrolled — the zero-config path
+The three shapes  — a pinned column with custom markup, a plain field, and a
+computed column that sorts.
+
+```tsx
+const columns: ColumnDef<ClassSession>[] = [
+  {
+    key: 'name',
+    header: 'Class',
+    sortable: true,
+    pinned: 'left',
+    width: 220,
+    cell: (session) => (
+      <div>
+        <p className="font-medium">{session.name}</p>
+        <p className="text-xs text-ink-muted">{session.room}</p>
+      </div>
+    ),
+  },
+
+  { key: 'instructor', header: 'Instructor', sortable: true, width: 170 },
+
+  {
+    key: 'attendance',
+    header: 'Attendance',
+    sortable: true,
+    width: 160,
+    sortAccessor: (session) => session.booked / session.capacity,
+    cell: (session) => `${session.booked} / ${session.capacity}`,
+  },
+];
+```
+
+The remaining props:
+
+| Group | Props |
+| --- | --- |
+| Sorting | `sortState`, `defaultSortState`, `onSortChange`, `manualSorting` |
+| Pagination | `pagination`, `defaultPagination`, `onPaginationChange`, `manualPagination`, `totalCount`, `pageSizeOptions`, `hidePagination` |
+| Expansion | `expansion` |
+| States and presentation | `isLoading`, `isFetching`, `error`, `onRetry`, `emptyState`, `skeletonRowCount`, `caption`, `maxHeight`, `density`, `className` |
+
+Error state wins over loading, which wins over empty, which wins over rows. `getRowId` uses
+`row.id` and falls back to the row index.
+
+---
+
+## Client-side vs server-side strategy (sort & pagination)
+
+Uncontrolled, the table owns everything:
+
+Example:
 
 ```tsx
 <DataTable
@@ -81,7 +155,9 @@ single generic: no `DataTable<T, TValue>`, and field access stays fully typed.
 />
 ```
 
-### Controlled + server-side
+Controlled and server-driven, the table renders what it is handed and reports changes:
+
+Example:
 
 ```tsx
 <DataTable
@@ -97,11 +173,29 @@ single generic: no `DataTable<T, TValue>`, and field access stays fully typed.
 />
 ```
 
-`manualSorting` / `manualPagination` are **orthogonal** to being controlled. You can control the
-state (to keep it in the URL, say) while the table still sorts and slices locally. The `manual*`
-flags only decide who does the work.
+### Reason
 
-### Expansion — both modes, still one generic
+`manualSorting` and `manualPagination` are separate from being controlled. Controlled decides who
+owns the state; the manual flags decide who does the work. Keeping sort state in the URL while the
+browser still sorts is a valid combination.
+
+Because of that split, the Client/Server toggle only flips the two flags.
+
+Client-Side Strategy:
+`useDataTable` handles the fetching side. Client mode requests the whole dataset once , never fetches again and leaves both `manualSorting` and `manualPagination` flags off.
+
+Server-Side Stategy:  In server mode both flags are true. The table sorts nothing and slices nothing — it shows the rows it was given and gets the page count from totalCount. Every sort or page change means a new request.
+
+Sorting:
+Sorting cycle includes ascending, descending, unsorted. The control is a `<button>` inside the `<th>`, and
+`aria-sort` follows the state. Empty values sort last in both directions.
+
+Pagination has a page-size select, prev/next, and a windowed page list with ellipses that collapses
+to like this example UI: `2 / 7` on narrow screens.
+
+---
+
+## Expandable-rows design for both inline and on-demand child rows
 
 ```tsx
 expansion={{
@@ -110,91 +204,60 @@ expansion={{
 }}
 ```
 
-- **Inline children:** `renderExpanded` reads `session.attendees` straight off the typed row.
-- **On-demand children:** the panel renders `<LazyRowContent load={…} fallback={<Skeleton/>}>`,
-  which owns its loading skeleton, error message, retry button, abort-on-collapse and result cache.
+Passing `expansion` adds a leading toggle column, pinned if any other column is.
 
-Child fetching deliberately lives *beside* the table, not inside it. Putting it on `DataTable`
-would force a second generic (`DataTable<TRow, TChild>`) or an `unknown` payload. This way the
-component stays headless and the same mechanism works for any expanded content.
+`renderExpanded` is a render prop, so the table does not know where children come from:
 
----
-
-## Feature notes
-
-**Sorting.** Header click cycles ascending → descending → unsorted. `aria-sort` mirrors the state
-on the `<th>`; the control itself is a real `<button>`. Empty values sort last in *both*
-directions so flipping the sort never fills page one with blanks.
-
-**Pagination.** Page size select, prev/next, and a windowed page list with ellipses. Collapses to
-`2 / 7` on narrow screens. `aria-current="page"` marks the active page.
-
-**Pinned column.** Sticky cells with offsets stacked from the widths of preceding pinned columns,
-so multiple left-pinned columns work. A CSS-only shadow appears when the container scrolls: the
-hook writes `data-scrolled-x` onto the DOM node rather than into React state, so scrolling never
-re-renders a single row.
-
-**Skeletons.** Real `<tr>`/`<td>` skeletons that keep the column layout, including the pinned
-column, with varied bar widths so it does not read as a grid of identical blocks.
-
-**Expand/collapse.** A CSS grid `0fr → 1fr` transition, which animates to `height: auto` without
-measuring anything. Content unmounts after the collapse transition ends and the animation is
-skipped under `prefers-reduced-motion`. The panel cell spans the whole table, which is far wider
-than the screen once the table scrolls, so its content is stuck to the visible area at the
-container's own width. Without that, anything right-aligned inside a panel (a Retry button, say)
-ends up off-screen.
-
-**Height cap.** `maxHeight` bounds the scroll container so a long body scrolls vertically under
-the sticky header instead of growing without limit. The attendee panel uses it once a class has
-more than eight bookings.
-
-**Accessibility.** Semantic `<table>` with a visually hidden `<caption>` and `<th scope="col">`,
-`aria-sort`, `aria-expanded` + `aria-controls` on the row toggles, `aria-busy` on the body while
-loading, `role="alert"` on errors, a polite live region announcing page, sort and loading changes,
-and a single focus-visible ring on every interactive element.
-
-**Performance.** Sorting is memoised on `(data, sortState)` so paging never re-sorts. Sort values
-are computed once per row rather than on every comparison, so an expensive accessor runs O(n)
-instead of O(n log n). Rows are `memo`ised with stable callbacks and ids, so expanding one row
-does not re-render the others. The DOM stays small because page size bounds it, which is why no
-virtualization is needed here.
-
-**Responsive.** Below `640px` pinning is dropped on purpose: a 220px sticky column on a 375px
-screen costs more than it gives. The attendee panel switches from a nested table to stacked cards.
+- Inline: read `session.attendees` off the row.
+- On-demand: render `<LazyRowContent load={…} fallback={<Skeleton/>} />`, which handles its own
+  loading state, error message, retry, abort on collapse, and result cache.
 
 ---
 
-## Edge cases
+## Sticky-column approach
 
-| Case | Behaviour |
-|---|---|
-| Empty dataset | Full-width empty state; header stays, pagination disabled |
-| Empty child list | The panel shows its own "No attendees booked yet" state |
-| Failed initial fetch | Table-level error row with `role="alert"` and Retry |
-| Failed child fetch | Error stays inside that one panel; the rest of the table keeps working |
-| Slow fetch | Skeletons immediately; server-mode page changes keep the old page visible and dimmed |
-| Invalid sort key | Renders unsorted, keeps the state, warns in dev, never throws |
-| Out-of-range page | Clamped for render, then `onPaginationChange` fires so a controlled parent converges |
-| Duplicate row ids | Falls back sensibly and warns in dev, since duplicates would break expansion |
-| Sort during load | Header buttons disabled while loading so a queued sort cannot desync server mode |
+Pin a column with `pinned: 'left'` and a `width`.
+
+Pinned cells get `position: sticky` and a `left` offset equal to the widths of the pinned columns
+before them, so more than one can be pinned.
 
 ---
 
-## Decisions and trade-offs
+## State management decision and why
 
-1. **Cells take the row, not a value.** One generic on the surface, at the cost of one property
-   access inside the renderer.
-2. **Child fetching sits outside the table.** Avoids a second generic; makes the panel reusable
-   for anything, not just child rows.
-3. **`manual*` separate from controlled.** Lets a consumer own the state without giving up client
-   processing, which is what makes the mode toggle seamless.
-4. **CSS grid height animation.** No measuring, works with dynamic content, and a `<tr>` cannot be
-   height-animated directly anyway.
-5. **Pinned columns need explicit widths.** Sticky offsets must be deterministic; documented
-   constraint instead of runtime measurement.
-6. **No virtualization.** Page size bounds the DOM, and `useTable` already returns the rows to
-   render, so a windowing layer could wrap the body without changing the hook.
-7. **No internal context.** Sub-components take explicit props so row memoisation is not defeated
-   by a context value changing on every render.
-8. **Row reordering is not animated.** A FLIP animation over 50 rows looks impressive in a demo and
-   feels slow in daily use.
+Used just pure React State Mangement:
+
+| Hook | Called by | Job |
+| --- | --- | --- |
+| `useTable<T>` | `DataTable` | Composes sorting, pagination and expansion, derives the rows to render. Does not fetch. |
+| `useDataTable<T>` | the dashboards | Fetches for client or server mode, returns props to spread. Does not render. |
+
+`useTable` is composed from `useSorting`, `usePagination` and `useRowExpansion`. All three are
+built on custom `useControllableState`, so the controlled/uncontrolled contract exists in one file and the
+three cannot drift apart.
+
+---
+
+## Tradeoffs considered and assumptions made
+
+### Tradeoffs
+
+- Cells take the row rather than a value. One generic instead of two, at the cost of a property
+  access in the renderer.
+- `manualSorting` and `manualPagination` are separate from controlled, so state
+  can be owned externally without giving up client processing.
+- The expand animation uses a CSS grid track instead of measured heights.
+- Pinned columns must explictility declare a width and pinning is off below 640px
+- Row reordering is not animated. It demos well and feels slow in use.
+- Support only light-mode  
+
+### Assumptions
+
+- Mock route handlers stand in for a backend. All three return `{ rows, totalCount }`, so client
+  mode calls them with no parameters and server mode asks for a page. Latency and failures come
+  from query flags.
+- Left pinning only. Right pinning is the same offset logic mirrored, left out to keep the API
+  small.
+- Mock data is seeded, so server and client produce identical rows.
+- Single-column sorting. Multi-column would change `SortState` to an array; the rest of the
+  pipeline would not change.
