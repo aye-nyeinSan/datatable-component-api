@@ -118,13 +118,6 @@ export function useTable<T>(options: TableOptions<T>): Table<T> {
     }
 
     const descending = sortState.direction === 'desc';
-    if (column.sortComparator) {
-      const comparator = column.sortComparator;
-      return data
-        .map((row, index) => ({ row, index }))
-        .sort((a, b) => comparator(a.row, b.row) * (descending ? -1 : 1) || a.index - b.index)
-        .map((entry) => entry.row);
-    }
 
     /**
      * Sort values are computed once per row rather than on every comparison, so

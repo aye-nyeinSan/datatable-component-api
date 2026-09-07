@@ -21,7 +21,6 @@ export interface ColumnDef<T> {
   header: ReactNode;
   cell?: (row: T) => ReactNode;
   sortAccessor?: (row: T) => SortValue;
-  sortComparator?: (a: T, b: T) => number;
   sortable?: boolean;
   width?: number;
   minWidth?: number;
