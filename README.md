@@ -4,6 +4,10 @@ A generic `DataTable<T>` built without a table library, plus two dashboards that
 pagination, expandable rows, a pinned column, skeleton loading and error states live in the
 component. The pages supply columns and data.
 
+Demo: [https://datatable-component-api.vercel.app/](https://datatable-component-api.vercel.app/)
+
+Repo: [https://github.com/aye-nyeinSan/datatable-component-api/](https://github.com/aye-nyeinSan/datatable-component-api/)
+
 ---
 
 ## Setup instructions
