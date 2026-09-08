@@ -23,6 +23,10 @@
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
   }
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 @layer components {
