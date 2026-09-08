@@ -8,6 +8,9 @@
   --color-ink-muted: oklch(0.52 0.015 265);
   --color-brand: oklch(0.55 0.16 264);
   --color-brand-soft: oklch(0.96 0.02 264);
+  /* Opaque equivalent of brand-soft at 50% over surface. Pinned cells must be
+     opaque, or columns scrolled beneath them bleed through. */
+  --color-brand-tint: oklch(0.98 0.01 264);
 }
 
 @layer base {
@@ -63,8 +66,11 @@
     grid-template-rows: 1fr;
   }
 
+  /* `clip`, not `hidden`: a hidden-overflow ancestor becomes the scroll
+     container for the sticky panel below, which would then stick to this
+     wrapper instead of the table's horizontal scroller. */
   .dt-collapsible > .dt-collapsible-inner {
-    overflow: hidden;
+    overflow: clip;
     min-height: 0;
   }
 

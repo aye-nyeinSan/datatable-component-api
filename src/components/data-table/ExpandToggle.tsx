@@ -23,6 +23,7 @@ export function ExpandToggle({
       className={cn(
         'grid size-7 place-items-center rounded-md text-ink-muted transition',
         'hover:bg-brand-soft hover:text-brand',
+        'group-hover/row:bg-brand-soft group-hover/row:text-brand',
       )}
     >
       <ChevronRight

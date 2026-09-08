@@ -65,7 +65,7 @@ export function DataTableHeader<T>({
                     aria-hidden
                     className={cn(
                       'size-3.5 shrink-0 transition-opacity',
-                      direction ? 'opacity-100' : 'opacity-0 group-hover/sort:opacity-60',
+                      direction ? 'opacity-100' : 'opacity-50 group-hover/sort:opacity-80',
                     )}
                   />
                 </button>
