@@ -3,7 +3,7 @@ import { AppHeader } from '@/layouts/AppHeader';
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Studio Ops — Data Table',
+  title: 'LifeSyle Studio',
   description: 'A reusable, headless-first data table rendering a fitness studio dashboard.',
 };
 
